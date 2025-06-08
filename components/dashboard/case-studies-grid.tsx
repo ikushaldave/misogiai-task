@@ -1,17 +1,25 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Edit, MoreHorizontal } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import Link from 'next/link';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Eye, Edit, MoreHorizontal } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 
 interface CaseStudy {
   id: string;
@@ -28,17 +36,20 @@ interface CaseStudiesGridProps {
   onRefresh: () => void;
 }
 
-export function CaseStudiesGrid({ caseStudies, onRefresh }: CaseStudiesGridProps) {
+export function CaseStudiesGrid({
+  caseStudies,
+  onRefresh,
+}: CaseStudiesGridProps) {
   const recentCaseStudies = caseStudies.slice(0, 6);
+  const router = useRouter();
+  const { user } = useAuth();
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Recent Case Studies</CardTitle>
-          <CardDescription>
-            Your latest portfolio projects
-          </CardDescription>
+          <CardDescription>Your latest portfolio projects</CardDescription>
         </div>
         <Link href="/dashboard/case-studies">
           <Button variant="outline" size="sm">
@@ -63,7 +74,10 @@ export function CaseStudiesGrid({ caseStudies, onRefresh }: CaseStudiesGridProps
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {recentCaseStudies.map((caseStudy) => (
-              <Card key={caseStudy.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={caseStudy.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -74,7 +88,7 @@ export function CaseStudiesGrid({ caseStudies, onRefresh }: CaseStudiesGridProps
                         {caseStudy.description}
                       </CardDescription>
                     </div>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -82,11 +96,19 @@ export function CaseStudiesGrid({ caseStudies, onRefresh }: CaseStudiesGridProps
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(
+                              `/${user?.username}/case-studies/${caseStudy.id}`
+                            )
+                          }
+                        >
                           <Eye className="h-4 w-4 mr-2" />
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/dashboard/case-studies`)}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
@@ -102,7 +124,9 @@ export function CaseStudiesGrid({ caseStudies, onRefresh }: CaseStudiesGridProps
                       )}
                     </div>
                     <span className="text-muted-foreground">
-                      {formatDistanceToNow(new Date(caseStudy.updated_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(caseStudy.updated_at), {
+                        addSuffix: true,
+                      })}
                     </span>
                   </div>
                 </CardContent>

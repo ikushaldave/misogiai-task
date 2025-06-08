@@ -32,7 +32,7 @@ interface CaseStudy {
 }
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, authUser } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [stats, setStats] = useState({
@@ -43,7 +43,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !authUser) {
       redirect("/auth");
     }
   }, [user, loading]);

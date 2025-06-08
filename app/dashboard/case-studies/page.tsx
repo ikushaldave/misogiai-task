@@ -7,22 +7,24 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { CaseStudyCard } from "@/components/case-studies/case-study-card";
 import { CreateCaseStudyDialog } from "@/components/case-studies/create-case-study-dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Grid, List, Pencil } from "lucide-react";
+import {
+  Plus,
+  Grid,
+  List,
+  Pencil,
+  Delete,
+  DeleteIcon,
+  Trash2,
+} from "lucide-react";
 import { redirect } from "next/navigation";
 import { toast } from "sonner";
+import { ThemeValue } from "@/types/case-study";
 
 interface TimelineEntry {
   id: string;
   title: string;
   description: string;
   date: string;
-}
-
-interface MediaItem {
-  id: string;
-  type: "image" | "video";
-  url: string;
-  caption?: string;
 }
 
 interface Outcome {
@@ -46,7 +48,7 @@ interface CaseStudy {
   duration: string;
   role: string;
   team_size: number;
-  images: MediaItem[];
+  images: string[];
   video_url: string;
   live_url: string;
   github_url: string;
@@ -57,17 +59,18 @@ interface CaseStudy {
 }
 
 export default function CaseStudiesPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, authUser } = useAuth();
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<CaseStudy | null>(
     null
   );
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !authUser) {
       redirect("/auth");
     }
   }, [user, loading]);
@@ -81,7 +84,13 @@ export default function CaseStudiesPage() {
   const fetchCaseStudies = async () => {
     const { data, error } = await supabase
       .from("case_studies")
-      .select("*")
+      .select(
+        `
+        *,
+        timelines (*),
+        outcomes (*)
+      `
+      )
       .eq("user_id", user?.id)
       .order("order_index", { ascending: true });
 
@@ -103,6 +112,21 @@ export default function CaseStudiesPage() {
     setSelectedCaseStudy(null);
     fetchCaseStudies();
     toast.success("Case study updated successfully");
+  };
+
+  const handleDelete = async (caseStudy: CaseStudy) => {
+    const { error } = await supabase
+      .from("case_studies")
+      .delete()
+      .eq("id", caseStudy.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error("Failed to delete case study");
+    } else {
+      toast.success("Case study deleted successfully");
+      fetchCaseStudies();
+    }
   };
 
   if (loading || !user) {
@@ -177,17 +201,27 @@ export default function CaseStudiesPage() {
               <div key={caseStudy.id} className="relative group">
                 <CaseStudyCard
                   caseStudy={caseStudy}
-                  viewMode={viewMode}
-                  onUpdate={fetchCaseStudies}
+                  user={user}
+                  theme={user.theme}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => handleEdit(caseStudy)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleEdit(caseStudy)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className=" opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleDelete(caseStudy)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

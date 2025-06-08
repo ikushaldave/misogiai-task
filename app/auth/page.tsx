@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,11 @@ import { ArrowLeft, Palette } from "lucide-react";
 import Link from "next/link";
 
 export default function AuthPage() {
-  const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, authUser, loading } = useAuth();
   const router = useRouter();
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
@@ -39,13 +37,10 @@ export default function AuthPage() {
       toast.success("Signed in successfully!");
       router.push("/dashboard");
     }
-
-    setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
@@ -62,9 +57,17 @@ export default function AuthPage() {
         "Account created successfully! Check your email to verify your account."
       );
     }
-
-    setLoading(false);
   };
+
+  useEffect(() => {
+    if (user && authUser && !loading) {
+      router.push("/dashboard");
+    }
+  }, [user, authUser, loading, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 flex items-center justify-center p-4">

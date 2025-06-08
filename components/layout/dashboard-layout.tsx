@@ -34,7 +34,7 @@ const navigation = [
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, authUser } = useAuth();
   const pathname = usePathname();
 
   return (
@@ -97,8 +97,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src={user?.user_metadata?.avatar_url}
+                      src={user?.avatar_url}
                       alt="Avatar"
+                      className="object-cover"
                     />
                     <AvatarFallback>
                       {user?.email?.charAt(0).toUpperCase()}
@@ -121,11 +122,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/profile">
                     <User className="mr-2 h-4 w-4" />
+
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/" target="_blank">
+                  <Link href={`/${user?.username}`} target="_blank">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     <span>View Portfolio</span>
                   </Link>

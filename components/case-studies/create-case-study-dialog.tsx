@@ -33,21 +33,14 @@ import {
 import { useFormik } from "formik";
 
 interface TimelineEntry {
-  id: string;
+  id?: string;
   title: string;
   description: string;
   date: string;
 }
 
-interface MediaItem {
-  id: string;
-  type: "image" | "video";
-  url: string;
-  caption?: string;
-}
-
 interface Outcome {
-  id: string;
+  id?: string;
   title: string;
   description: string;
   metrics: string[];
@@ -67,7 +60,7 @@ interface CaseStudy {
   duration: string;
   role: string;
   team_size: number;
-  images: MediaItem[];
+  images: string[];
   video_url: string;
   live_url: string;
   github_url: string;
@@ -104,14 +97,7 @@ const caseStudySchema = z.object({
   duration: z.string().min(1, "Duration is required"),
   role: z.string().min(1, "Role is required"),
   team_size: z.number().min(1, "Team size must be at least 1"),
-  images: z.array(
-    z.object({
-      id: z.string(),
-      type: z.enum(["image", "video"]),
-      url: z.string().url("Must be a valid URL"),
-      caption: z.string().optional(),
-    })
-  ),
+  images: z.array(z.string()).optional().or(z.literal("")),
   video_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   live_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   github_url: z
@@ -122,10 +108,10 @@ const caseStudySchema = z.object({
   timelines: z
     .array(
       z.object({
-        id: z.string(),
-        title: z.string().min(1, "Title is required"),
-        description: z.string().min(1, "Description is required"),
-        date: z.string().min(1, "Date is required"),
+        id: z.string().optional().or(z.literal("")),
+        title: z.string().optional().or(z.literal("")),
+        description: z.string().optional().or(z.literal("")),
+        date: z.string().optional().or(z.literal("")),
       })
     )
     .optional()
@@ -133,14 +119,24 @@ const caseStudySchema = z.object({
   outcomes: z
     .array(
       z.object({
-        id: z.string(),
-        title: z.string().min(1, "Title is required"),
-        description: z.string().min(1, "Description is required"),
-        metrics: z.array(z.string()).min(1, "At least one metric is required"),
+        id: z.string().optional().or(z.literal("")),
+        title: z.string().optional().or(z.literal("")),
+        description: z.string().optional().or(z.literal("")),
+        metrics: z.array(z.string()).optional().or(z.literal("")),
       })
     )
     .optional()
     .or(z.literal("")),
+  newTimelineEntry: z.object({
+    title: z.string().optional().or(z.literal("")),
+    description: z.string().optional().or(z.literal("")),
+    date: z.string().optional().or(z.literal("")),
+  }),
+  newOutcome: z.object({
+    title: z.string().optional().or(z.literal("")),
+    description: z.string().optional().or(z.literal("")),
+    metrics: z.array(z.string()).optional().or(z.literal("")),
+  }),
 });
 
 const commonTools = [
@@ -190,42 +186,40 @@ export function CreateCaseStudyDialog({
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedTool, setSelectedTool] = useState("");
 
-  const newTimelineEntry = {
-    id: "",
-    title: "",
-    description: "",
-    date: "",
-  };
-
-  const newOutcome = {
-    id: "",
-    title: "",
-    description: "",
-    metrics: [],
-  };
-
   const formik = useFormik({
     initialValues: {
-      title: caseStudy?.title || "Test Title",
-      description: caseStudy?.description || "Test Description",
-      overview: caseStudy?.overview || "Test Overview",
+      title: caseStudy?.title || "",
+      description: caseStudy?.description || "",
+      overview: caseStudy?.overview || "",
       cover_image: caseStudy?.cover_image || "",
-      challenge: caseStudy?.challenge || "Test Challenge",
-      solution: caseStudy?.solution || "Test Solution",
-      outcome: caseStudy?.outcome || "Test Outcome",
-      tools: caseStudy?.tools || ["Test Tool"],
-      technologies: caseStudy?.technologies || ["Test Technology"],
-      duration: caseStudy?.duration || "Test Duration",
-      role: caseStudy?.role || "Test Role",
-      team_size: caseStudy?.team_size || 1,
+      challenge: caseStudy?.challenge || "",
+      solution: caseStudy?.solution || "",
+      outcome: caseStudy?.outcome || "",
+      tools: caseStudy?.tools || [],
+      technologies: caseStudy?.technologies || [],
+      duration: caseStudy?.duration || "",
+      role: caseStudy?.role || "",
+      team_size: caseStudy?.team_size || "",
       images: caseStudy?.images || [],
       video_url: caseStudy?.video_url || "",
       live_url: caseStudy?.live_url || "",
       github_url: caseStudy?.github_url || "",
       timelines: caseStudy?.timelines || [],
       outcomes: caseStudy?.outcomes || [],
-      client: caseStudy?.client || "Test Client",
-      industry: caseStudy?.industry || "Test Industry",
+      client: caseStudy?.client || "",
+      industry: caseStudy?.industry || "",
+      newTimelineEntry: {
+        title: "",
+        description: "",
+        date: "",
+      },
+      newOutcome: {
+        title: "",
+        description: "",
+        metrics: [],
+      },
+      removedTimelines: [],
+      removedOutcomes: [],
     },
     validationSchema: toFormikValidationSchema(caseStudySchema),
     onSubmit: async (values, { setSubmitting }) => {
@@ -233,7 +227,6 @@ export function CreateCaseStudyDialog({
 
       setSubmitting(true);
       try {
-        // Upload cover image if it's a new file
         let coverImageUrl = values.cover_image;
         if (coverImage && coverImage.startsWith("data:")) {
           const coverImageFile = await fetch(coverImage).then((r) => r.blob());
@@ -258,7 +251,6 @@ export function CreateCaseStudyDialog({
           coverImageUrl = publicUrl;
         }
 
-        // Upload additional images
         const uploadedUrls = await Promise.all(
           uploadedFiles.map(async (file) => {
             const filePath = `case-studies/${user.id}/${Date.now()}-${
@@ -283,24 +275,28 @@ export function CreateCaseStudyDialog({
           })
         );
 
-        const { outcomes, timelines, ...caseStudyData } = {
+        if (uploadedUrls.length > 0) {
+          values.images = [...values.images, ...uploadedUrls];
+        }
+
+        const {
+          outcomes,
+          timelines,
+          newOutcome,
+          newTimelineEntry,
+          removedTimelines,
+          removedOutcomes,
+          ...caseStudyData
+        } = {
           ...values,
           cover_image: coverImageUrl,
-          images: [
-            ...values.images,
-            ...uploadedUrls.map((url) => ({
-              id: Date.now().toString(),
-              type: "image",
-              url,
-              caption: "",
-            })),
-          ],
+          images: values.images.length > 0 ? values.images : undefined,
         };
 
         if (mode === "edit" && caseStudy) {
           const { error } = await supabase
             .from("case_studies")
-            .update({
+            .upsert({
               id: caseStudy.id,
               ...caseStudyData,
             })
@@ -311,10 +307,17 @@ export function CreateCaseStudyDialog({
           if (outcomes.length > 0) {
             const { error: outError } = await supabase
               .from("outcomes")
-              .update({
-                ...outcomes,
-              })
-              .eq("case_study_id", caseStudy.id);
+              .upsert(
+                outcomes.map((outcome) => {
+                  return {
+                    ...outcome,
+                    case_study_id: caseStudy.id,
+                    user_id: user.id,
+                  };
+                })
+              )
+              .eq("case_study_id", caseStudy.id)
+              .eq("user_id", user.id);
 
             if (outError) throw outError;
           }
@@ -322,12 +325,43 @@ export function CreateCaseStudyDialog({
           if (timelines.length > 0) {
             const { error: timelineError } = await supabase
               .from("timelines")
-              .update({
-                ...timelines,
-              })
-              .eq("case_study_id", caseStudy.id);
+              .upsert(
+                timelines.map((timeline) => {
+                  return {
+                    ...timeline,
+                    case_study_id: caseStudy.id,
+                    user_id: user.id,
+                  };
+                })
+              )
+              .eq("case_study_id", caseStudy.id)
+              .eq("user_id", user.id);
 
             if (timelineError) throw timelineError;
+          }
+
+          if (removedTimelines.length > 0) {
+            for (const timelineId of removedTimelines) {
+              const { error: removedTimelineError } = await supabase
+                .from("timelines")
+                .delete()
+                .eq("id", timelineId)
+                .eq("user_id", user.id);
+
+              if (removedTimelineError) throw removedTimelineError;
+            }
+          }
+
+          if (removedOutcomes.length > 0) {
+            for (const outcomeId of removedOutcomes) {
+              const { error: removedOutcomeError } = await supabase
+                .from("outcomes")
+                .delete()
+                .eq("id", outcomeId)
+                .eq("user_id", user.id);
+
+              if (removedOutcomeError) throw removedOutcomeError;
+            }
           }
         } else {
           const { data: newCaseStudy, error: caseStudyError } = await supabase
@@ -346,25 +380,37 @@ export function CreateCaseStudyDialog({
           if (caseStudyError) throw caseStudyError;
 
           if (outcomes.length > 0) {
-            const { error: outError } = await supabase.from("outcomes").insert({
-              ...outcomes,
-              case_study_id: newCaseStudy.id,
-            });
+            const { error: outError } = await supabase.from("outcomes").insert(
+              outcomes.map((outcome) => ({
+                ...outcome,
+                user_id: user.id,
+                case_study_id: newCaseStudy.id,
+              }))
+            );
 
-            if (outError) throw outError;
+            if (outError) {
+              toast.error("Failed to create outcomes");
+              return;
+            }
           }
 
           if (timelines.length > 0) {
             const { error: timelineError } = await supabase
               .from("timelines")
-              .insert({
-                ...timelines,
-                case_study_id: newCaseStudy.id,
-              });
+              .insert(
+                timelines.map((timeline) => ({
+                  ...timeline,
+                  user_id: user.id,
+                  case_study_id: newCaseStudy.id,
+                }))
+              );
 
-            if (timelineError) throw timelineError;
+            if (timelineError) {
+              toast.error("Failed to create timelines");
+              return;
+            }
           }
-          router.push(`/dashboard/case-studies/${newCaseStudy.id}`);
+          router.push(`/${user.username}/case-studies/${newCaseStudy.id}`);
         }
 
         onSuccess();
@@ -396,12 +442,27 @@ export function CreateCaseStudyDialog({
     );
   };
 
-  const addTimelineEntry = (entry: typeof newTimelineEntry) => {
-    if (!entry.title || !entry.description || !entry.date) return;
+  const addTimelineEntry = () => {
+    const { newTimelineEntry } = formik.values;
+    if (
+      !newTimelineEntry.title ||
+      !newTimelineEntry.description ||
+      !newTimelineEntry.date
+    ) {
+      toast.error("Please fill in all timeline entry fields");
+      return;
+    }
+
     formik.setFieldValue("timelines", [
       ...formik.values.timelines,
-      { ...entry, id: Date.now().toString() },
+      { ...newTimelineEntry },
     ]);
+
+    formik.setFieldValue("newTimelineEntry", {
+      title: "",
+      description: "",
+      date: "",
+    });
   };
 
   const removeTimelineEntry = (id: string) => {
@@ -411,12 +472,23 @@ export function CreateCaseStudyDialog({
     );
   };
 
-  const addOutcome = (outcome: typeof newOutcome) => {
-    if (!outcome.title || !outcome.description) return;
+  const addOutcome = () => {
+    const { newOutcome } = formik.values;
+    if (!newOutcome.title || !newOutcome.description) {
+      toast.error("Please fill in all outcome fields");
+      return;
+    }
+
     formik.setFieldValue("outcomes", [
       ...formik.values.outcomes,
-      { ...outcome, id: Date.now().toString() },
+      { ...newOutcome },
     ]);
+
+    formik.setFieldValue("newOutcome", {
+      title: "",
+      description: "",
+      metrics: [],
+    });
   };
 
   const removeOutcome = (id: string) => {
@@ -584,10 +656,10 @@ export function CreateCaseStudyDialog({
                       className="mt-2 border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
                     >
                       <input {...getCoverImageInputProps()} />
-                      {coverImage ? (
+                      {coverImage || formik.values.cover_image ? (
                         <div className="relative group">
                           <img
-                            src={coverImage}
+                            src={coverImage || formik.values.cover_image || ""}
                             alt="Cover"
                             className="max-h-48 mx-auto rounded object-cover w-full"
                           />
@@ -774,48 +846,45 @@ export function CreateCaseStudyDialog({
                   <div className="grid grid-cols-3 gap-2">
                     <Input
                       placeholder="Title"
-                      value={newTimelineEntry.title}
-                      onChange={(e) =>
-                        formik.setFieldValue("timelines", [
-                          ...formik.values.timelines,
-                          { ...newTimelineEntry, id: Date.now().toString() },
-                        ])
-                      }
+                      value={formik.values.newTimelineEntry.title}
+                      onChange={(e) => {
+                        formik.setFieldValue(
+                          "newTimelineEntry.title",
+                          e.target.value
+                        );
+                      }}
                     />
                     <Input
                       type="date"
-                      value={newTimelineEntry.date}
-                      onChange={(e) =>
-                        formik.setFieldValue("timelines", [
-                          ...formik.values.timelines,
-                          { ...newTimelineEntry, id: Date.now().toString() },
-                        ])
-                      }
+                      value={formik.values.newTimelineEntry.date}
+                      onChange={(e) => {
+                        formik.setFieldValue(
+                          "newTimelineEntry.date",
+                          e.target.value
+                        );
+                      }}
                     />
-                    <Button
-                      type="button"
-                      onClick={() => addTimelineEntry(newTimelineEntry)}
-                    >
+                    <Button type="button" onClick={addTimelineEntry}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Entry
                     </Button>
                   </div>
                   <Textarea
                     placeholder="Description"
-                    value={newTimelineEntry.description}
-                    onChange={(e) =>
-                      formik.setFieldValue("timelines", [
-                        ...formik.values.timelines,
-                        { ...newTimelineEntry, id: Date.now().toString() },
-                      ])
-                    }
+                    value={formik.values.newTimelineEntry.description}
+                    onChange={(e) => {
+                      formik.setFieldValue(
+                        "newTimelineEntry.description",
+                        e.target.value
+                      );
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Timeline Entries</Label>
-                  {formik.values.timelines.map((entry) => (
+                  {formik.values.timelines.map((entry, index) => (
                     <div
-                      key={entry.id}
+                      key={entry.id || index}
                       className="flex items-start space-x-2 p-2 border rounded"
                     >
                       <div className="flex-grow">
@@ -828,7 +897,15 @@ export function CreateCaseStudyDialog({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeTimelineEntry(entry.id)}
+                        onClick={() => {
+                          formik.setFieldValue(
+                            "timelines",
+                            formik.values.timelines.filter(
+                              (e) => e.id !== entry.id
+                            )
+                          );
+                          formik.setFieldValue("removedTimelines", [entry.id]);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -856,40 +933,64 @@ export function CreateCaseStudyDialog({
                     </p>
                   </div>
                 </div>
-                {uploadedFiles.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Uploaded Files</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      {uploadedFiles.map((file, index) => (
-                        <div
-                          key={index}
-                          className="relative border rounded p-2"
+                <div className="space-y-2">
+                  <Label>Media Preview</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {formik.values.images.map((image, index) => (
+                      <div
+                        key={image}
+                        className="relative border rounded p-2 group"
+                      >
+                        <img
+                          src={image}
+                          alt={`Media ${index + 1}`}
+                          className="w-full h-32 object-cover rounded"
+                        />
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            formik.setFieldValue(
+                              "images",
+                              formik.values.images.filter((_, i) => i !== index)
+                            );
+                          }}
                         >
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={file.name}
-                            className="w-full h-32 object-cover rounded"
-                          />
-                          <div className="text-sm text-muted-foreground mt-1 truncate">
-                            {file.name}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2"
-                            onClick={() => {
-                              setUploadedFiles((files) =>
-                                files.filter((_, i) => i !== index)
-                              );
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="relative border rounded p-2 group"
+                      >
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="w-full h-32 object-cover rounded"
+                        />
+                        <div className="text-sm text-muted-foreground mt-1 truncate">
+                          {file.name}
                         </div>
-                      ))}
-                    </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            setUploadedFiles((files) =>
+                              files.filter((_, i) => i !== index)
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -951,38 +1052,35 @@ export function CreateCaseStudyDialog({
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       placeholder="Title"
-                      value={newOutcome.title}
-                      onChange={(e) =>
-                        formik.setFieldValue("outcomes", [
-                          ...formik.values.outcomes,
-                          { ...newOutcome, id: Date.now().toString() },
-                        ])
-                      }
+                      value={formik.values.newOutcome.title}
+                      onChange={(e) => {
+                        formik.setFieldValue(
+                          "newOutcome.title",
+                          e.target.value
+                        );
+                      }}
                     />
-                    <Button
-                      type="button"
-                      onClick={() => addOutcome(newOutcome)}
-                    >
+                    <Button type="button" onClick={addOutcome}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Outcome
                     </Button>
                   </div>
                   <Textarea
                     placeholder="Description"
-                    value={newOutcome.description}
-                    onChange={(e) =>
-                      formik.setFieldValue("outcomes", [
-                        ...formik.values.outcomes,
-                        { ...newOutcome, id: Date.now().toString() },
-                      ])
-                    }
+                    value={formik.values.newOutcome.description}
+                    onChange={(e) => {
+                      formik.setFieldValue(
+                        "newOutcome.description",
+                        e.target.value
+                      );
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Outcomes</Label>
-                  {formik.values.outcomes.map((outcome) => (
+                  {formik.values.outcomes.map((outcome, index) => (
                     <div
-                      key={outcome.id}
+                      key={outcome.id || index}
                       className="flex items-start space-x-2 p-2 border rounded"
                     >
                       <div className="flex-grow">
@@ -998,7 +1096,21 @@ export function CreateCaseStudyDialog({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => removeMetric(outcome.id, metric)}
+                                onClick={() => {
+                                  formik.setFieldValue(
+                                    "outcomes",
+                                    formik.values.outcomes.map((o) =>
+                                      o.id === outcome.id
+                                        ? {
+                                            ...o,
+                                            metrics: o.metrics.filter(
+                                              (m) => m !== metric
+                                            ),
+                                          }
+                                        : o
+                                    )
+                                  );
+                                }}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -1007,12 +1119,22 @@ export function CreateCaseStudyDialog({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() =>
-                              addMetric(
-                                outcome.id,
-                                prompt("Enter metric:") || ""
-                              )
-                            }
+                            onClick={() => {
+                              const metric = prompt("Enter metric:");
+                              if (metric) {
+                                formik.setFieldValue(
+                                  "outcomes",
+                                  formik.values.outcomes.map((o) =>
+                                    o.id === outcome.id
+                                      ? {
+                                          ...o,
+                                          metrics: [...o.metrics, metric],
+                                        }
+                                      : o
+                                  )
+                                );
+                              }
+                            }}
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Metric
@@ -1022,7 +1144,15 @@ export function CreateCaseStudyDialog({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeOutcome(outcome.id)}
+                        onClick={() => {
+                          formik.setFieldValue(
+                            "outcomes",
+                            formik.values.outcomes.filter(
+                              (o) => o.id !== outcome.id
+                            )
+                          );
+                          formik.setFieldValue("removedOutcomes", [outcome.id]);
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

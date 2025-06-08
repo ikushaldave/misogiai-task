@@ -5,7 +5,8 @@ import { User } from "@supabase/supabase-js";
 import { useState, useEffect, createContext, useContext } from "react";
 
 type AuthContextType = {
-  user: User | null;
+  authUser: User | null;
+  user: any | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<any>;
   signUp: (
@@ -15,38 +16,48 @@ type AuthContextType = {
     fullName: string
   ) => Promise<any>;
   signOut: () => Promise<void>;
+  getUser: (id: string) => Promise<any>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const getUser = async (id: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single();
+    setUser(data);
+    return data || null || error;
+  };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { data, error };
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (data.user) {
+        setAuthUser(data.user);
+      }
+      return { data, error };
+    } catch (error) {
+      return {
+        data: null,
+        error:
+          error instanceof Error
+            ? error
+            : new Error("An unexpected error occurred"),
+      };
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (
@@ -56,13 +67,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fullName: string
   ) => {
     try {
+      setLoading(true);
       const { data: existingUser } = await supabase
         .from("profiles")
         .select("username")
         .eq("username", username)
         .single();
-
-      console.log("existingUser", existingUser);
 
       if (existingUser) {
         return {
@@ -82,15 +92,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      console.log("data", data);
-
       if (error) {
         return { data: null, error };
       }
 
-      console.log("data", data);
       if (data.user) {
-        // Create profile
         const { error: profileError } = await supabase.from("profiles").insert({
           id: data.user.id,
           username,
@@ -109,6 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ),
           };
         }
+
+        setAuthUser(data.user);
       }
 
       return { data, error: null };
@@ -120,6 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ? error
             : new Error("An unexpected error occurred"),
       };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,8 +137,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        getUser(session.user.id);
+        setAuthUser(session.user);
+      } else {
+        setAuthUser(null);
+      }
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        getUser(session.user.id);
+        setAuthUser(session.user);
+      } else {
+        setAuthUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ authUser, user, loading, signIn, signUp, signOut, getUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

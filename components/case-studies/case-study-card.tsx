@@ -12,27 +12,29 @@ import Image from "next/image";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-
-interface CaseStudy {
-  id: string;
-  title: string;
-  description: string;
-  overview: string;
-  cover_image: string;
-  client: string;
-  industry: string;
-}
+import { CaseStudy, Profile, ThemeValue } from "@/types/case-study";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Users } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import {
+  ThemeCard,
+  ThemeBadge,
+  ThemeContent,
+} from "@/components/theme-wrapper";
 
 interface CaseStudyCardProps {
   caseStudy: CaseStudy;
-  viewMode: "grid" | "list";
-  onUpdate: () => void;
+  theme: ThemeValue;
+  className?: string;
+  user: Profile;
 }
 
 export function CaseStudyCard({
   caseStudy,
-  viewMode,
-  onUpdate,
+  theme,
+  className,
+  user,
 }: CaseStudyCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -48,7 +50,6 @@ export function CaseStudyCard({
         .eq("id", caseStudy.id);
 
       if (error) throw error;
-      onUpdate();
     } catch (error) {
       console.error("Error deleting case study:", error);
       alert("Failed to delete case study");
@@ -57,95 +58,72 @@ export function CaseStudyCard({
     }
   };
 
-  if (viewMode === "list") {
-    return (
-      <Card className="flex items-center p-4">
-        <div className="relative h-20 w-20 flex-shrink-0">
+  return (
+    <Link
+      href={`/${user.username}/case-studies/${caseStudy.id}`}
+      className={cn(
+        "group",
+        theme === "creative" ? "hover:scale-105 transition-transform" : ""
+      )}
+    >
+      <ThemeCard
+        theme={theme}
+        className={cn("h-full overflow-hidden", className)}
+      >
+        <div className="relative aspect-video">
           <Image
-            src={caseStudy.cover_image || "/placeholder.png"}
+            src={caseStudy.cover_image}
             alt={caseStudy.title}
             fill
-            className="object-cover rounded-md"
+            className="object-cover"
           />
         </div>
-        <div className="ml-4 flex-grow">
-          <h3 className="font-semibold">{caseStudy.title}</h3>
-          <p className="text-sm text-muted-foreground line-clamp-2">
+        <div className="p-6">
+          <h3
+            className={cn(
+              "font-semibold mb-2",
+              theme === "creative" ? "text-xl" : ""
+            )}
+          >
+            {caseStudy.title}
+          </h3>
+          <ThemeContent theme={theme} className="text-sm mb-4 line-clamp-2">
             {caseStudy.description}
-          </p>
+          </ThemeContent>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-2" />
+                <span>{caseStudy.duration}</span>
+              </div>
+              <div className="flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                <span>{caseStudy.team_size}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {caseStudy.tools.slice(0, 3).map((tool: string) => (
+                <ThemeBadge
+                  key={tool}
+                  theme={theme}
+                  className={cn(
+                    theme === "creative"
+                      ? "hover:scale-110 transition-transform"
+                      : ""
+                  )}
+                >
+                  {tool}
+                </ThemeBadge>
+              ))}
+              {caseStudy.tools.length > 3 && (
+                <Badge variant="outline" className="text-muted-foreground">
+                  +{caseStudy.tools.length - 3}
+                </Badge>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() =>
-              router.push(`/dashboard/case-studies/${caseStudy.id}`)
-            }
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/case-studies/${caseStudy.id}`)}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="relative h-48">
-        <Image
-          src={caseStudy.cover_image || "/placeholder.png"}
-          alt={caseStudy.title}
-          fill
-          className="object-cover"
-        />
-      </div>
-      <CardHeader>
-        <h3 className="font-semibold">{caseStudy.title}</h3>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-3">
-          {caseStudy.description}
-        </p>
-      </CardContent>
-      <CardFooter className="flex justify-end space-x-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push(`/dashboard/case-studies/${caseStudy.id}`)}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleDelete}
-          disabled={isDeleting}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push(`/case-studies/${caseStudy.id}`)}
-        >
-          <ExternalLink className="h-4 w-4" />
-        </Button>
-      </CardFooter>
-    </Card>
+      </ThemeCard>
+    </Link>
   );
 }
